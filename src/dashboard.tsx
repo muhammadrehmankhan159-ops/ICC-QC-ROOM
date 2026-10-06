@@ -1,5 +1,56 @@
-import {useCallback,useEffect,useMemo,useState,FormEvent} from 'react';import {Link,useParams} from 'react-router-dom';
-import {sb,useAuth} from './lib';import {isQcStaff} from './access';import {META,Status,summarize,attentionLabel,needsAttention,byStructure,fmtDay,fmtTime,fmtStamp} from './monitor';
+import {useCallback,useEffect,useMemo,useRef,useState,FormEvent} from 'react';import {Link,useParams} from 'react-router-dom';
+import {sb,useAuth} from './lib';import {canManageLatestNews,canViewLatestNews,isQcStaff} from './access';import {META,Status,summarize,attentionLabel,needsAttention,byStructure,fmtDay,fmtTime,fmtStamp} from './monitor';
+
+function HeroSection(){
+ const shellRef=useRef<HTMLDivElement|null>(null);
+ const videoRef=useRef<HTMLVideoElement|null>(null);
+ const routeRef=useRef<SVGPathElement|null>(null);
+ const truckRef=useRef<HTMLDivElement|null>(null);
+ const [progress,setProgress]=useState(0);
+
+ useEffect(()=>{
+  const update=()=>{
+   const el=shellRef.current;if(!el)return;
+   const rect=el.getBoundingClientRect();
+   const total=Math.max(el.offsetHeight-window.innerHeight,0);
+   const next=total>0?Math.min(Math.max((window.innerHeight-rect.top)/el.offsetHeight,0),1):0;
+   setProgress(next);
+  };
+  update();
+  window.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('resize',update);
+  return()=>{window.removeEventListener('scroll',update);window.removeEventListener('resize',update)};
+ },[]);
+
+ useEffect(()=>{
+  const video=videoRef.current;if(!video)return;
+  const duration=Math.max(video.duration||1,1);
+  const target=progress*duration;
+  try{video.currentTime=Math.min(Math.max(target,0),duration)}catch{}
+ },[progress]);
+
+ useEffect(()=>{
+  const route=routeRef.current;const truck=truckRef.current;if(!route||!truck)return;
+  const total=route.getTotalLength();
+  const travel=0.08 + progress*0.82;
+  const safe=Math.min(Math.max(travel,0),1);
+  const point=route.getPointAtLength(safe*total);
+  const prev=route.getPointAtLength(Math.max(0,(safe*total)-2));
+  const angle=Math.atan2(point.y-prev.y,point.x-prev.x)*(180/Math.PI);
+  truck.style.transform=`translate(${point.x}px, ${point.y}px) rotate(${angle}deg)`;
+ },[progress]);
+
+ return <div ref={shellRef} className="hero-scroll-shell"><div className="hero-stage">
+  <video ref={videoRef} className="hero-video" muted playsInline autoPlay loop preload="auto" src="/3D_logistics_map_animation_20261005182048.mp4"/>
+  <div className="hero-overlay"/>
+  <div className="hero-content"><div className="hero-badge">Global Logistics</div><h1>Precision tracking from source to destination.</h1><p>Real-time coordination, route visibility and delivery confidence across every leg of the journey.</p><div className="hero-actions"><Link to="/app/reports" className="hero-primary">View QC reports</Link><Link to="/app/dashboard" className="hero-secondary">Live status</Link></div></div>
+  <svg className="hero-map" viewBox="0 0 900 460" aria-hidden="true">
+   <path d="M 28 330 C 110 300, 170 250, 220 265 S 325 325, 390 245 S 540 98, 645 160 S 755 250, 872 210" className="route-track"/>
+   <path ref={routeRef} d="M 28 330 C 110 300, 170 250, 220 265 S 325 325, 390 245 S 540 98, 645 160 S 755 250, 872 210" className="route-line"/>
+  </svg>
+  <div ref={truckRef} className="truck"><div className="truck-body"><span className="truck-window"/><span className="truck-cabin"/></div><span className="truck-wheel truck-wheel-front"/><span className="truck-wheel truck-wheel-back"/></div>
+ </div></div>
+}
 type Upd={remark:string;created_at:string;poster:{full_name:string}|null};
 export type M={id:string;name:string;department:{name:string;code:string};process:{name:string;sort:number}|null;current:any};
 type U={id:string;machine_id:string;status:Status;remark:string;created_at:string;machine:{name:string;process:{name:string}|null}|null;poster:{full_name:string}|null};
@@ -48,11 +99,17 @@ function AddUpdate({machines,onDone}:{machines:M[];onDone:()=>void}){const [d,se
 const RC=['INSPECTION_PENDING','HOLD','RE_TEST','APPROVED'] as const;
 function useReportCounts(){const [c,setC]=useState<Record<string,number>>({INSPECTION_PENDING:0,HOLD:0,RE_TEST:0,APPROVED:0});
  useEffect(()=>{const l=async()=>{const o:Record<string,number>={};for(const s of RC){const r=await sb.from('inspections').select('id',{count:'exact',head:true}).eq('status',s);o[s]=r.count||0}setC(o)};l();const t=setInterval(l,30000);return()=>clearInterval(t)},[]);return c}
+function LatestNews(){const {profile}=useAuth();const [items,setItems]=useState<any[]>([]);const [err,setErr]=useState('');const canView=canViewLatestNews(profile?.role);const canManage=canManageLatestNews(profile?.role);
+ useEffect(()=>{if(!canView){setItems([]);return;}let active=true;const load=async()=>{try{const {data,error}=await sb.from('latest_news').select('id,title,summary,content,created_at,updated_at').order('created_at',{ascending:false}).limit(3);if(!active)return;if(error){setErr(error.message);return;}setItems(data||[]);setErr('');}catch{if(active)setErr('Latest News unavailable.');}};void load();return()=>{active=false;};},[canView,profile?.role]);
+ if(!canView)return null;
+ return <section className="card"><h3>📰 Latest News</h3>{err&&<p className="err">{err}</p>}{items.length===0?<p className="mut">No recent updates available.</p>:items.map(item=><div key={item.id} className="feed" style={{borderLeftColor:'#0f766e'}}><b>{item.title}</b><p>{item.summary || item.content}</p><small className="mut">{fmtStamp(item.created_at)}</small>{canManage&&<Link to="/app/admin" className="more">Manage latest news →</Link>}</div>)}</section>}
 export function Dashboard(){const {profile}=useAuth();const rc=useReportCounts();const {machines,updates,err,loaded,reload}=useDashboard();const [sel,setSel]=useState<string|null>(null);const [adding,setAdding]=useState(false);const [tab,setTab]=useState('ALL');
  const tot=useMemo(()=>summarize(machines.map(st)),[machines]);const attn=machines.filter(m=>needsAttention(st(m)));const selM=machines.find(m=>m.id===sel)||null;const anyStatus=machines.some(m=>st(m));
  const Counts=()=><><Count s="RUNNING" n={tot.RUNNING}/><Count s="HOLD" n={tot.HOLD}/><Count s="STOPPED" n={tot.STOPPED}/></>;
  return <div className="cr">
+ <HeroSection/>
  <header className="hdr card"><div><h1>🧪 QC CONTROL ROOM</h1><span className="mut">Imran Crown Cork</span></div><div className="hr"><div className="hc"><Counts/></div><Clock/></div></header>
+ <LatestNews/>
  <section className="pulse card"><b>FACTORY PULSE</b><div className="hc"><Counts/></div></section>
  {err&&<p className="err" style={{gridArea:'pulse'}}>{err}</p>}
  <section className="monitor card"><h3>🔎 LIVE QC MONITOR</h3><p className="mut" style={{marginTop:-6}}>QC observation panel — status shows what QC is monitoring, not production quality.</p>

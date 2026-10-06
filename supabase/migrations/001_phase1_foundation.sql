@@ -15,8 +15,24 @@ create function is_admin() returns boolean language sql stable security definer 
 create function is_qc_staff() returns boolean language sql stable security definer set search_path=public as $$select coalesce(my_role() in('admin','qa_qc_manager','qc_checker','qc_assistant'),false)$$;
 create function my_customers() returns setof uuid language sql stable security definer set search_path=public as $$select cu.customer_id from customer_users cu join customers c on c.id=cu.customer_id where cu.user_id=auth.uid() and cu.active and c.active and exists(select 1 from profiles p where p.id=auth.uid() and p.active and p.role='customer')$$;
 
-create function on_signup() returns trigger language plpgsql security definer set search_path=public as $$begin
- insert into profiles(id,email,full_name) values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email)); return new;end$$;
+create function on_signup() returns trigger language plpgsql security definer set search_path=public as $$
+declare requested text; 
+begin
+ requested:=lower(coalesce(new.raw_user_meta_data->>'requested_role', new.raw_user_meta_data->>'role', 'customer'));
+ if requested in ('owner','owner_admin','owner-admin','admin') then
+  if exists(select 1 from profiles where role='admin') then
+   raise exception 'An owner/admin account already exists. Sign in with the current owner/admin account instead.';
+  end if;
+  insert into profiles(id,email,full_name,role,active)
+  values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'admin',true)
+  on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='admin', active=true;
+  return new;
+ end if;
+ insert into profiles(id,email,full_name,role,active)
+ values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'customer',false)
+ on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='customer', active=false;
+ return new;
+end$$;
 create trigger t_signup after insert on auth.users for each row execute function on_signup();
 create function touch() returns trigger language plpgsql as $$begin new.updated_at=now();return new;end$$;
 create trigger t_touch_p before update on profiles for each row execute function touch();
