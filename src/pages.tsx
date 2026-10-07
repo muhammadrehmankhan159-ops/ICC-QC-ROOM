@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,FormEvent} from 'react';import {Navigate,NavLink,Outlet,Link,useParams} from 'react-router-dom';
-import {sb,useAuth} from './lib';import {ROLE_LABEL,isQcStaff,Role,resolveSignupRole} from './access';import {AdminMachines} from './department';
+import {sb,useAuth} from './lib';import {ROLE_LABEL,isQcStaff,Role,resolveSignupRole,isTemporaryAdminOverride} from './access';import {AdminMachines} from './department';
 
 function HeroSection({onSequenceComplete}:{onSequenceComplete:()=>void}){
  const shellRef=useRef<HTMLDivElement|null>(null);
@@ -53,9 +53,10 @@ function HeroSection({onSequenceComplete}:{onSequenceComplete:()=>void}){
 }
 
 export function Login(){const {session,profile}=useAuth();const [e,setE]=useState('');const [p,setP]=useState('');const [name,setName]=useState('');const [mode,setMode]=useState<'login'|'signup'>('login');const [err,setErr]=useState('');const [msg,setMsg]=useState('');const [busy,setBusy]=useState(false);const [sequenceComplete,setSequenceComplete]=useState(false);
- if(session&&profile?.active)return <Navigate to="/app" replace/>;
+ const tempAdmin=isTemporaryAdminOverride(session?.user?.email ?? profile?.email);
+ if(session&&(profile?.active||tempAdmin))return <Navigate to="/app" replace/>;
  const go=async(ev:FormEvent)=>{ev.preventDefault();setBusy(true);setErr('');setMsg('');
-  if(mode==='signup'){if(!name.trim())return setErr('Full name is required');const role=resolveSignupRole('customer',false);const {error}=await sb.auth.signUp({email:e.trim(),password:p,options:{data:{full_name:name.trim(),requested_role:role,signup_kind:'customer'}}});setBusy(false);if(error){setErr(error.message)}else{setMsg('Customer account created. Please wait for Admin activation and customer mapping.');setMode('login');setName('');setP('')}}
+  if(mode==='signup'){if(!name.trim())return setErr('Full name is required');const role=resolveSignupRole('customer',false);const {error}=await sb.auth.signUp({email:e.trim(),password:p,options:{data:{full_name:name.trim(),requested_role:role,signup_kind:'customer'}}});setBusy(false);if(error){setErr(error.message)}else{setMsg('Customer account created. Please verify your email, then sign in and enter your assigned Customer PIN.');setMode('login');setName('');setP('')}}
   else{const {error}=await sb.auth.signInWithPassword({email:e.trim(),password:p});setBusy(false);if(error)setErr(error.message);else sb.rpc('log_login')}
  };
  return <div className="landing-page"><HeroSection onSequenceComplete={()=>setSequenceComplete(true)}/>{sequenceComplete&&<div className="auth-page"><form onSubmit={go} className="card login"><h2 style={{margin:0}}>QC MANAGEMENT & CUSTOMER PORTAL</h2><p className="mut">Imran Crown Crok Pvt Ltd</p>
@@ -64,13 +65,13 @@ export function Login(){const {session,profile}=useAuth();const [e,setE]=useStat
  <button disabled={busy} style={{width:'100%'}}>{busy?mode==='signup'?'Creating account…':'Signing in…':mode==='signup'?'Create customer account':'Sign in'}</button>
  <p className="mut" style={{marginTop:10}}><button type="button" className="linkbtn" onClick={()=>{setMode(m=>m==='login'?'signup':'login');setErr('');setMsg('')}}>{mode==='login'?'Create customer account':'Back to sign in'}</button></p>
  {msg&&<p className="mut" style={{color:'#0f766e'}}>{msg}</p>}{err&&<p className="err">{err}</p>}</form></div>}</div>}
-export function Inactive(){return <div className="card login"><h3>Account not active</h3><p>Your account has not been activated. Please contact the Administrator.</p><button onClick={()=>sb.auth.signOut()}>Sign out</button></div>}
+export function Inactive(){return <div className="card login"><h3>Account not active</h3><p>Your email must be verified before the Customer Portal can be accessed. If your email is already verified and you still cannot sign in, please contact the Administrator.</p><button onClick={()=>sb.auth.signOut()}>Sign out</button></div>}
 export function Denied(){return <div className="card"><h2>Access denied</h2><p>You do not have permission to view this page.</p><Link to="/app">Go back</Link></div>}
-export function Layout(){const {profile}=useAuth();const r=profile!.role as Role;
+export function Layout(){const {session,profile}=useAuth();const tempAdmin=isTemporaryAdminOverride(session?.user?.email ?? profile?.email);const r=(tempAdmin ? 'admin' : profile?.role ?? 'customer') as Role;
  return <div className="shell"><aside className="side"><b>QC MANAGEMENT & CUSTOMER PORTAL</b><small>Imran Crown Crok Pvt Ltd</small>
  {isQcStaff(r)&&<NavLink to="/app/dashboard">QC Control Room</NavLink>}{isQcStaff(r)&&<NavLink to="/app/reports">QC Reports</NavLink>}{r==='customer'&&<><NavLink to="/app/portal" end>Current</NavLink><NavLink to="/app/portal/reports">Reports</NavLink></>}
  {r==='admin'&&<><NavLink to="/app/admin" end>Admin</NavLink>{['departments','machines','customers','users','roles','customer-access','customer-login-activity'].map(s=><NavLink key={s} className="sub" to={`/app/admin/${s}`}>{s.replace(/-/g,' ')}</NavLink>)}</>}
- <div style={{marginTop:'auto'}}><small>{profile!.full_name}<br/><span className="pill">{ROLE_LABEL[r]}</span></small><br/><button onClick={()=>sb.auth.signOut()}>Logout</button></div></aside><main><Outlet/></main></div>}
+ <div style={{marginTop:'auto'}}><small>{profile?.full_name ?? session?.user?.email ?? 'Admin'}<br/><span className="pill">{ROLE_LABEL[r]}</span></small><br/><button onClick={()=>sb.auth.signOut()}>Logout</button></div></aside><main><Outlet/></main></div>}
 export const AdminHome=()=><div className="card"><h2>Admin</h2><p className="mut">Phase 1 foundation: read-only views of the configuration. Management screens come in later phases.</p></div>;
 const Q:Record<string,{t:string;sel:string;cols:string[]}>={
  departments:{t:'departments',sel:'name,code,active',cols:['name','code','active']},
