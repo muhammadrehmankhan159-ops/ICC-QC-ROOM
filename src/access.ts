@@ -5,7 +5,6 @@ export const QC_CHECKER_ROLE='qc_checker' as const;
 export const QC_ASSISTANT_ROLE='qc_assistant' as const;
 export const PRODUCTION_ROLE='production' as const;
 export const CUSTOMER_ROLE='customer' as const;
-export const TEMPORARY_TEST_ADMIN_EMAILS = ['muhammadrehmankhan159@gmail.com'] as const;
 export const ROLE_LABEL:Record<Role,string>={admin:'Owner / Admin',qa_qc_manager:'QC Manager',qc_checker:'QC Checker',qc_assistant:'QC Assistant',production:'Production',customer:'Customer'};
 export const isOwner=(r?:string)=>r===OWNER_ROLE;
 export const isQcManager=(r?:string)=>r===QC_MANAGER_ROLE;
@@ -14,11 +13,6 @@ export const isQcAssistant=(r?:string)=>r===QC_ASSISTANT_ROLE;
 export const isCustomer=(r?:string)=>r===CUSTOMER_ROLE;
 export const isQcStaff=(r?:string)=>r===OWNER_ROLE||r===QC_MANAGER_ROLE||r===QC_CHECKER_ROLE||r===QC_ASSISTANT_ROLE;
 export const isInternal=(r?:string)=>!!r&&r!==CUSTOMER_ROLE;
-export const isTemporaryAdminOverride=(email?:string|null)=>{
-  if(!email) return false;
-  const normalized=email.trim().toLowerCase();
-  return TEMPORARY_TEST_ADMIN_EMAILS.some((v)=>v.toLowerCase()===normalized);
-};
 export const canViewLatestNews=(r?:string)=>isOwner(r)||isQcManager(r)||isQcChecker(r)||isQcAssistant(r);
 export const canManageLatestNews=(r?:string)=>isOwner(r);
 export const canManageUsers=(r?:string)=>isOwner(r);
@@ -39,15 +33,8 @@ export function resolveSignupRole(requestedRole?:string|null,hasExistingAdmin=fa
  return adminAliases.has(raw)&&!hasExistingAdmin?'admin':'customer';
 }
 export type Gate='ok'|'login'|'denied'|'portal';
-export function gate(path:string,p:{role:Role;active:boolean}|null,email?:string|null):Gate{
- if(!p||!p.active){
-   if(isTemporaryAdminOverride(email)) return 'ok';
-   return 'login';
- }
- if(isTemporaryAdminOverride(email)){
-   if(path.startsWith('/app/portal')) return 'ok';
-   return 'ok';
- }
+export function gate(path:string,p:{role:Role;active:boolean}|null):Gate{
+ if(!p||!p.active)return 'login';
  if(path.startsWith('/app/admin'))return isOwner(p.role)?'ok':'denied';
  if(path.startsWith('/app/dashboard')||path.startsWith('/app/department')||path.startsWith('/app/reports'))return isQcStaff(p.role)?'ok':p.role===CUSTOMER_ROLE?'portal':'denied';
  if(path.startsWith('/app/portal'))return p.role===CUSTOMER_ROLE?'ok':'denied';

@@ -1,56 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState,FormEvent} from 'react';import {Link,useParams} from 'react-router-dom';
 import {sb,useAuth} from './lib';import {canManageLatestNews,canViewLatestNews,isQcStaff} from './access';import {META,Status,summarize,attentionLabel,needsAttention,byStructure,fmtDay,fmtTime,fmtStamp} from './monitor';
 
-function HeroSection(){
- const shellRef=useRef<HTMLDivElement|null>(null);
- const videoRef=useRef<HTMLVideoElement|null>(null);
- const routeRef=useRef<SVGPathElement|null>(null);
- const truckRef=useRef<HTMLDivElement|null>(null);
- const [progress,setProgress]=useState(0);
-
- useEffect(()=>{
-  const update=()=>{
-   const el=shellRef.current;if(!el)return;
-   const rect=el.getBoundingClientRect();
-   const total=Math.max(el.offsetHeight-window.innerHeight,0);
-   const next=total>0?Math.min(Math.max((window.innerHeight-rect.top)/el.offsetHeight,0),1):0;
-   setProgress(next);
-  };
-  update();
-  window.addEventListener('scroll',update,{passive:true});
-  window.addEventListener('resize',update);
-  return()=>{window.removeEventListener('scroll',update);window.removeEventListener('resize',update)};
- },[]);
-
- useEffect(()=>{
-  const video=videoRef.current;if(!video)return;
-  const duration=Math.max(video.duration||1,1);
-  const target=progress*duration;
-  try{video.currentTime=Math.min(Math.max(target,0),duration)}catch{}
- },[progress]);
-
- useEffect(()=>{
-  const route=routeRef.current;const truck=truckRef.current;if(!route||!truck)return;
-  const total=route.getTotalLength();
-  const travel=0.08 + progress*0.82;
-  const safe=Math.min(Math.max(travel,0),1);
-  const point=route.getPointAtLength(safe*total);
-  const prev=route.getPointAtLength(Math.max(0,(safe*total)-2));
-  const angle=Math.atan2(point.y-prev.y,point.x-prev.x)*(180/Math.PI);
-  truck.style.transform=`translate(${point.x}px, ${point.y}px) rotate(${angle}deg)`;
- },[progress]);
-
- return <div ref={shellRef} className="hero-scroll-shell"><div className="hero-stage">
-  <video ref={videoRef} className="hero-video" muted playsInline autoPlay loop preload="auto" src="/3D_logistics_map_animation_20261005182048.mp4"/>
-  <div className="hero-overlay"/>
-  <div className="hero-content"><div className="hero-badge">Global Logistics</div><h1>Precision tracking from source to destination.</h1><p>Real-time coordination, route visibility and delivery confidence across every leg of the journey.</p><div className="hero-actions"><Link to="/app/reports" className="hero-primary">View QC reports</Link><Link to="/app/dashboard" className="hero-secondary">Live status</Link></div></div>
-  <svg className="hero-map" viewBox="0 0 900 460" aria-hidden="true">
-   <path d="M 28 330 C 110 300, 170 250, 220 265 S 325 325, 390 245 S 540 98, 645 160 S 755 250, 872 210" className="route-track"/>
-   <path ref={routeRef} d="M 28 330 C 110 300, 170 250, 220 265 S 325 325, 390 245 S 540 98, 645 160 S 755 250, 872 210" className="route-line"/>
-  </svg>
-  <div ref={truckRef} className="truck"><div className="truck-body"><span className="truck-window"/><span className="truck-cabin"/></div><span className="truck-wheel truck-wheel-front"/><span className="truck-wheel truck-wheel-back"/></div>
- </div></div>
-}
 type Upd={remark:string;created_at:string;poster:{full_name:string}|null};
 export type M={id:string;name:string;department:{name:string;code:string};process:{name:string;sort:number}|null;current:any};
 type U={id:string;machine_id:string;status:Status;remark:string;created_at:string;machine:{name:string;process:{name:string}|null}|null;poster:{full_name:string}|null};
@@ -106,28 +56,50 @@ function LatestNews(){const {profile}=useAuth();const [items,setItems]=useState<
 export function Dashboard(){const {profile}=useAuth();const rc=useReportCounts();const {machines,updates,err,loaded,reload}=useDashboard();const [sel,setSel]=useState<string|null>(null);const [adding,setAdding]=useState(false);const [tab,setTab]=useState('ALL');
  const tot=useMemo(()=>summarize(machines.map(st)),[machines]);const attn=machines.filter(m=>needsAttention(st(m)));const selM=machines.find(m=>m.id===sel)||null;const anyStatus=machines.some(m=>st(m));
  const Counts=()=><><Count s="RUNNING" n={tot.RUNNING}/><Count s="HOLD" n={tot.HOLD}/><Count s="STOPPED" n={tot.STOPPED}/></>;
- return <div className="cr">
- <HeroSection/>
- <header className="hdr card"><div><h1>🧪 QC CONTROL ROOM</h1><span className="mut">Imran Crown Cork</span></div><div className="hr"><div className="hc"><Counts/></div><Clock/></div></header>
- <LatestNews/>
- <section className="pulse card"><b>FACTORY PULSE</b><div className="hc"><Counts/></div></section>
- {err&&<p className="err" style={{gridArea:'pulse'}}>{err}</p>}
- <section className="monitor card"><h3>🔎 LIVE QC MONITOR</h3><p className="mut" style={{marginTop:-6}}>QC observation panel — status shows what QC is monitoring, not production quality.</p>
-  <div className="big">{(['RUNNING','STOPPED','HOLD'] as Status[]).map(s=><div key={s} style={{borderColor:META[s].color}}><span style={{color:META[s].color}}>{META[s].dot} {META[s].label}</span><b>{tot[s]}</b></div>)}</div>
-  <div className="tabs">{[{code:'ALL',name:'ALL'},...DEPTS].map(t=><button key={t.code} className={tab===t.code?'on':''} onClick={()=>setTab(t.code)}>{t.name}</button>)}</div>
-  {!loaded?<p className="mut">Loading…</p>:machines.length===0?<p className="mut">No machine status available</p>:<>{!anyStatus&&<p className="mut">No machine status available</p>}
-  {DEPTS.filter(d=>tab==='ALL'||tab===d.code).map(d=><div key={d.code}><h4 className="dh">{d.name}</h4><div className="mgrid">{machines.filter(m=>m.department.code===d.code).map(m=>{const s=st(m);return <button key={m.id} className={`mb ${s||'NONE'}`} style={s?{borderLeftColor:META[s].color}:undefined} onClick={()=>setSel(m.id)}><small>{m.process?.name||'MACHINE'}</small><span>{s?META[s].dot:'⚪'} {m.name}</span><b style={s?{color:META[s].color}:undefined}>{s?META[s].label:'NO CURRENT STATUS'}</b><small>{s?META[s].sub:'—'}</small></button>})}</div></div>)}</>}</section>
- <section className="updates card"><h3>📰 LATEST QC UPDATES {isQcStaff(profile?.role)&&<button className="add" onClick={()=>setAdding(!adding)}>{adding?'× CLOSE':'+ ADD UPDATE'}</button>}</h3>
-  {adding&&<AddUpdate machines={machines} onDone={()=>{setAdding(false);reload()}}/>}
-  {loaded&&updates.length===0?<p className="mut">No live QC updates yet</p>:updates.map(u=>{const d=new Date(u.created_at);return <article key={u.id} className="feed" style={{borderLeftColor:META[u.status].color}}><b>{META[u.status].dot} {u.machine?.name}{u.machine?.process?` · ${u.machine.process.name}`:''} — {u.status}</b><p>{u.remark}</p><small className="mut">{fmtDay(d)} • {fmtTime(d)} • {u.poster?.full_name||'—'}</small></article>})}</section>
- <section className="attention card"><h3>⚠️ QC ATTENTION</h3>{attn.length===0&&!rc.INSPECTION_PENDING&&!rc.RE_TEST?(
-  <p className="mut">No items requiring QC attention</p>
-):(
-  <>
-   {rc.INSPECTION_PENDING>0&&<Link to="/app/reports?status=INSPECTION_PENDING" className="att"><b>🟡 Inspection Pending — {rc.INSPECTION_PENDING}</b></Link>}
-   {rc.RE_TEST>0&&<Link to="/app/reports?status=RE_TEST" className="att"><b>🔴 Re-test Required — {rc.RE_TEST}</b></Link>}
-   {attn.map(m=>{const u=last(m);return <button key={m.id} className="att" onClick={()=>setSel(m.id)}><b>{attentionLabel(st(m))} — {m.name}</b><small>{m.department.name}{m.process?` · ${m.process.name}`:''}{u?` · ${u.remark} · ${fmtStamp(u.created_at)}`:''}</small></button>})}
-  </>
- )}<h4 className="dh">QC REPORTS</h4><div className="rc">{RC.map(s=><Link key={s} to={`/app/reports?status=${s}`}><b>{rc[s]}</b><span>{s==='RE_TEST'?'RE-TEST':s.replace('_',' ')}</span></Link>)}</div></section>
- <section className="depts">{DEPTS.map(d=>{const c=summarize(machines.filter(m=>m.department.code===d.code).map(st));return <Link key={d.code} to={`/app/department/${d.code}`} className="card dept"><h3>{d.name}</h3><div>🟢 Running: <b>{c.RUNNING}</b></div><div>🟡 Hold: <b>{c.HOLD}</b></div><div>🔴 Attention: <b>{c.STOPPED}</b></div><span className="more">VIEW QC STATUS →</span></Link>})}</section>
- {selM&&<MachineModal m={selM} onClose={()=>setSel(null)}/>}</div>}
+ const factoryRows = DEPTS.filter(d=>tab==='ALL'||tab===d.code).flatMap(d => machines.filter(m=>m.department.code===d.code).map(m => ({ ...m, status: st(m) })));
+ const newsItems = updates.slice(0,3).map((u)=>({
+   key: u.id,
+   title: `${u.machine?.name ?? 'Machine'} ${u.status}`,
+   time: fmtTime(new Date(u.created_at)),
+   detail: u.remark,
+   color: META[u.status].color,
+ }));
+ return <div className="qc-dashboard">
+  <header className="qc-topbar">
+   <div className="qc-branding"><h1>QC CONTROL ROOM</h1><span>Imran Crown Cork Pvt Ltd</span></div>
+   <div className="qc-header-stats">
+    <span className="qc-status-pill stop"><span className="dot red" />3 STOPPED</span>
+    <span className="qc-status-pill run"><span className="dot green" />18 RUNNING</span>
+    <div className="qc-timebox"><span className="mini-grid" /><Clock/></div>
+   </div>
+  </header>
+  <div className="qc-dashboard-grid">
+   <section className="qc-panel factory-panel">
+    <div className="panel-heading"><span className="panel-mark">🏭</span><h2>LIVE FACTORY</h2></div>
+    <div className="summary-row"><div className="summary-card run"><span className="dot green"/> <strong>{tot.RUNNING}</strong><small>RUNNING</small></div><div className="summary-card stop"><span className="dot red"/> <strong>{tot.STOPPED}</strong><small>STOPPED</small></div><div className="summary-card hold"><span className="dot amber"/> <strong>{tot.HOLD}</strong><small>HOLD</small></div></div>
+    <div className="factory-table">
+      <div className="factory-row header-row"><span>Machine / Line</span><span>Status</span></div>
+      {factoryRows.length === 0 ? <div className="factory-row empty">No machine status available.</div> : factoryRows.map((m)=>{const s=m.status; return <div key={m.id} className="factory-row"><span className="machine-name"><span className="machine-icon">🏭</span>{m.name}</span><span className={`status-badge ${s ? s.toLowerCase() : 'none'}`}>{s ? META[s].dot + ' ' + META[s].label : 'NO STATUS'}</span></div>})}
+    </div>
+   </section>
+   <aside className="qc-panel news-panel">
+    <div className="panel-heading"><span className="panel-mark">📰</span><h2>LATEST NEWS</h2></div>
+    <div className="news-list">
+      {newsItems.length === 0 ? <p className="mut">No recent updates available.</p> : newsItems.map((item)=> <div key={item.key} className="news-item"><div className="news-head"><span className="dot" style={{background:item.color}} /> <strong>{item.title}</strong><small>{item.time} • QC</small></div><p>{item.detail}</p></div>)}
+      {isQcStaff(profile?.role) && <button className="add" onClick={()=>setAdding(!adding)}>{adding?'× CLOSE':'+ ADD UPDATE'}</button>}
+      {adding && <AddUpdate machines={machines} onDone={()=>{setAdding(false);reload()}}/>}
+    </div>
+   </aside>
+   <section className="qc-product-grid">
+    {DEPTS.map((d)=>{const c=summarize(machines.filter(m=>m.department.code===d.code).map(st)); return <div key={d.code} className="qc-product-card">
+      <div className="product-header"><span className="product-name">{d.name}</span></div>
+      <div className="product-stats">
+       <div className="mini-stat run"><span className="dot green" /> {c.RUNNING}<small>Running</small></div>
+       <div className="mini-stat stop"><span className="dot red" /> {c.STOPPED}<small>Stopped</small></div>
+      </div>
+      <div className="product-visual product-visual--plastic" aria-hidden="true" />
+    </div>})}
+   </section>
+  </div>
+  {err && <p className="err" style={{marginTop:8}}>{err}</p>}
+  {selM&&<MachineModal m={selM} onClose={()=>setSel(null)}/>}</div>}
