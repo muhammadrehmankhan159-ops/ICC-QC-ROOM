@@ -1,69 +1,22 @@
-import {useEffect,useRef,useState,FormEvent} from 'react';import {Navigate,NavLink,Outlet,Link,useParams} from 'react-router-dom';
+import {useEffect,useState,FormEvent} from 'react';import {Navigate,NavLink,Outlet,Link,useParams} from 'react-router-dom';
 import {sb,useAuth} from './lib';import {ROLE_LABEL,isQcStaff,Role,resolveSignupRole} from './access';import {AdminMachines} from './department';
 
-function HeroSection({onSequenceComplete}:{onSequenceComplete:()=>void}){
- const shellRef=useRef<HTMLDivElement|null>(null);
- const mapRef=useRef<HTMLVideoElement|null>(null);
- const factoryRef=useRef<HTMLVideoElement|null>(null);
- const rafRef=useRef<number|undefined>(undefined);
- const completeRef=useRef(false);
-
- useEffect(()=>{
-  const shell=shellRef.current; const map=mapRef.current; const factory=factoryRef.current;
-  if(!shell||!map||!factory)return;
-
-  const clamp=(v:number,min:number,max:number)=>Math.min(Math.max(v,min),max);
-  const sync=()=>{
-   const max=Math.max(shell.offsetHeight-window.innerHeight,1);
-   const progress=clamp((window.scrollY-shell.offsetTop)/max,0,1);
-   const mapDuration=Math.max(map.duration||1,1);
-   const factoryDuration=Math.max(factory.duration||1,1);
-   const total=mapDuration+factoryDuration;
-   const combined=progress*total;
-   const mapTime=clamp(combined,0,mapDuration);
-   const factoryTime=clamp(combined-mapDuration,0,factoryDuration);
-   const factoryReveal=clamp((combined-mapDuration)/Math.max(factoryDuration,0.001),0,1);
-
-   if(Math.abs(map.currentTime-mapTime)>0.03){map.currentTime=mapTime;}
-   if(Math.abs(factory.currentTime-factoryTime)>0.03){factory.currentTime=factoryTime;}
-
-   map.style.opacity=String(Math.max(1-(factoryReveal*1.8),0));
-   factory.style.opacity=String(Math.min(Math.max(factoryReveal,0),1));
-
-   if(!completeRef.current && combined >= total - 0.12){
-    completeRef.current=true;
-    onSequenceComplete();
-   }
-
-   rafRef.current=requestAnimationFrame(sync);
-  };
-
-  map.muted=true;factory.muted=true;map.pause();factory.pause();map.currentTime=0;factory.currentTime=0;
-  sync();
-
-  return()=>{
-   if(rafRef.current!==undefined){cancelAnimationFrame(rafRef.current);rafRef.current=undefined;}
-  };
- },[onSequenceComplete]);
-
- return <div ref={shellRef} className="hero-scroll-shell"><div className="hero-stage">
-  <video ref={mapRef} className="hero-video hero-video-map" playsInline muted preload="auto" src="/3D_logistics_map_scroll_animation_20261006174252.mp4"/>
-  <video ref={factoryRef} className="hero-video hero-video-factory" playsInline muted preload="auto" src="/Modify_factory_video_ending_20261006175035.mp4"/>
- </div></div>
+function LoginVideo(){
+ return <div className="login-video-shell" aria-hidden="true"><video className="login-video" autoPlay muted loop playsInline preload="auto" src="/3D_logistics_map_scroll_animation_20261006174252.mp4"/><div className="login-video-overlay"/></div>;
 }
 
-export function Login(){const {session,profile}=useAuth();const [e,setE]=useState('');const [p,setP]=useState('');const [name,setName]=useState('');const [mode,setMode]=useState<'login'|'signup'>('login');const [err,setErr]=useState('');const [msg,setMsg]=useState('');const [busy,setBusy]=useState(false);const [sequenceComplete,setSequenceComplete]=useState(false);
+export function Login(){const {session,profile}=useAuth();const [e,setE]=useState('');const [p,setP]=useState('');const [name,setName]=useState('');const [mode,setMode]=useState<'login'|'signup'>('login');const [err,setErr]=useState('');const [msg,setMsg]=useState('');const [busy,setBusy]=useState(false);
  if(session&&profile?.active)return <Navigate to="/app" replace/>;
  const go=async(ev:FormEvent)=>{ev.preventDefault();setBusy(true);setErr('');setMsg('');
   if(mode==='signup'){if(!name.trim())return setErr('Full name is required');const role=resolveSignupRole('customer',false);const {error}=await sb.auth.signUp({email:e.trim(),password:p,options:{data:{full_name:name.trim(),requested_role:role,signup_kind:'customer'}}});setBusy(false);if(error){setErr(error.message)}else{setMsg('Customer account created. Please verify your email, then sign in and enter your assigned Customer PIN.');setMode('login');setName('');setP('')}}
   else{const {error}=await sb.auth.signInWithPassword({email:e.trim(),password:p});setBusy(false);if(error)setErr(error.message);else sb.rpc('log_login')}
  };
- return <div className="landing-page"><HeroSection onSequenceComplete={()=>setSequenceComplete(true)}/>{sequenceComplete&&<div className="auth-page"><form onSubmit={go} className="card login"><h2 style={{margin:0}}>QC MANAGEMENT & CUSTOMER PORTAL</h2><p className="mut">Imran Crown Crok Pvt Ltd</p>
+ return <div className="landing-page"><LoginVideo/><div className="auth-page"><form onSubmit={go} className="card login"><h2 style={{margin:0}}>QC MANAGEMENT & CUSTOMER PORTAL</h2><p className="mut">Imran Crown Crok Pvt Ltd</p>
  {mode==='signup'&&<label>Full Name<input type="text" required value={name} onChange={x=>setName(x.target.value)}/></label>}
  <label>Email<input type="email" required autoComplete="username" value={e} onChange={x=>setE(x.target.value)}/></label><label>Password<input type="password" required autoComplete="current-password" value={p} onChange={x=>setP(x.target.value)}/></label>
  <button disabled={busy} style={{width:'100%'}}>{busy?mode==='signup'?'Creating account…':'Signing in…':mode==='signup'?'Create customer account':'Sign in'}</button>
  <p className="mut" style={{marginTop:10}}><button type="button" className="linkbtn" onClick={()=>{setMode(m=>m==='login'?'signup':'login');setErr('');setMsg('')}}>{mode==='login'?'Create customer account':'Back to sign in'}</button></p>
- {msg&&<p className="mut" style={{color:'#0f766e'}}>{msg}</p>}{err&&<p className="err">{err}</p>}</form></div>}</div>}
+ {msg&&<p className="mut" style={{color:'#0f766e'}}>{msg}</p>}{err&&<p className="err">{err}</p>}</form></div></div>}
 export function Inactive(){return <div className="card login"><h3>Account not active</h3><p>Your email must be verified before the Customer Portal can be accessed. If your email is already verified and you still cannot sign in, please contact the Administrator.</p><button onClick={()=>sb.auth.signOut()}>Sign out</button></div>}
 export function Denied(){return <div className="card"><h2>Access denied</h2><p>You do not have permission to view this page.</p><Link to="/app">Go back</Link></div>}
 export function Layout(){const {profile}=useAuth();const r=profile!.role as Role;

@@ -92,13 +92,11 @@ button{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:8px
 .auth-page::before{content:'';position:absolute;inset:0;background:rgba(255,255,255,.08);backdrop-filter:blur(.5px)}
 .login{position:relative;z-index:1;max-width:430px;width:min(100%,430px);margin:0 auto;padding:28px 26px;border-radius:20px;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.42);box-shadow:0 18px 40px rgba(15,23,42,.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .login h2{font-size:clamp(1.4rem,2vw,2rem);line-height:1.15;letter-spacing:.02em;text-align:center;color:#0f172a}.login .mut{color:rgba(15,23,42,.72)}.login label{display:block;color:rgba(15,23,42,.9);font-size:14px;font-weight:600}.login input{background:rgba(255,255,255,.14);border:1px solid rgba(148,163,184,.44);color:#0f172a;margin:8px 0 14px;box-shadow:inset 0 1px 2px rgba(15,23,42,.04)}.login input::placeholder{color:rgba(51,65,85,.58)}.login button{width:100%;padding:12px 14px;border-radius:10px;font-weight:700;letter-spacing:.02em}.login .linkbtn{background:transparent;color:#0f172a;padding:0;border:0;cursor:pointer;text-decoration:underline;font-weight:600}.login .err{color:#b91c1c;margin-top:10px}.mut{color:var(--mut)}.err{color:#b91c1c}.pill{background:#ccfbf1;color:#115e59;border-radius:10px;padding:2px 8px;font-size:12px}.linkbtn{background:transparent;color:var(--brand);padding:0;border:0;cursor:pointer;text-decoration:underline}
-.landing-page{display:block}
-.hero-scroll-shell{position:relative;height:370vh;margin:0;background:#030d17;overflow:visible}
-.hero-stage{position:sticky;top:0;height:100vh;overflow:hidden;background:#030d17;border:0;border-radius:0;box-shadow:none}
-.hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#030d17;filter:saturate(1.05) contrast(1.08) brightness(.76);transition:opacity .18s linear}
-.hero-video-map{opacity:1}
-.hero-video-factory{opacity:0}
-@media(max-width:900px){.hero-stage{border-radius:0}}
+.landing-page{position:relative;display:block;min-height:100vh;background:#dfeaf2;overflow:hidden}
+.login-video-shell{position:absolute;inset:0;z-index:0}
+.login-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.08) contrast(1.08) brightness(.7)}
+.login-video-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(5,12,18,.52),rgba(15,23,42,.35));}
+.auth-page{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:28px}
 /* Phase 2: QC Control Room */
 .cr{display:grid;gap:14px;grid-template-columns:1fr 1fr;grid-template-areas:"hdr hdr" "monitor updates" "attention updates" "depts depts"}
 .cr .card{margin:0}.hdr{grid-area:hdr;display:flex;justify-content:space-between;align-items:center;background:var(--side);color:#fff;border:0}.hdr h1{margin:0;font-size:24px;letter-spacing:.5px}.hdr .mut{color:#94a3b8}
