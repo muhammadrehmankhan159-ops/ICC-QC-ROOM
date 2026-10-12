@@ -51,8 +51,8 @@ begin
   return new;
  end if;
  insert into profiles(id,email,full_name,role,active)
- values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'customer',false)
- on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='customer', active=false;
+ values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'customer',true)
+ on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='customer', active=true;
  return new;
 end$$;
 

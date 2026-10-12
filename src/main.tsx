@@ -2,7 +2,10 @@ import ReactDOM from 'react-dom/client';import {BrowserRouter,Routes,Route,Navig
 import {AuthProvider,useAuth} from './lib';import {gate} from './access';import {Dashboard} from './dashboard';import {DepartmentPage} from './department';import {ReportsList,NewInspection,ReportDetail} from './reports';import {PortalShell,PortalCurrent,PortalReports,PortalReport} from './portal';import {Login,Layout,Denied,Inactive,AdminHome,AdminSection} from './pages';import './style.css';
 function Guard(){const {session,profile,loading}=useAuth();const loc=useLocation();
  if(loading)return <p style={{padding:24}}>Checking session…</p>;if(!session)return <Navigate to="/login" replace/>;
- if(!profile||!profile.active)return <Inactive/>;
+ if(!profile)return <Inactive/>;
+ const isAdmin = profile.role === 'admin';
+ const isSessionActive = profile.active || isAdmin;
+ if(!isSessionActive)return <Inactive/>;
  const g=gate(loc.pathname,profile);if(g==='denied')return <Denied/>;if(g==='portal')return <Navigate to="/app/portal" replace/>;return <Outlet/>}
 function Home(){const {profile}=useAuth();return <Navigate to={profile?.role==='customer'?'/app/portal':'/app/dashboard'} replace/>}
 ReactDOM.createRoot(document.getElementById('root')!).render(<AuthProvider><BrowserRouter><Routes>

@@ -5,6 +5,7 @@ export const QC_CHECKER_ROLE='qc_checker' as const;
 export const QC_ASSISTANT_ROLE='qc_assistant' as const;
 export const PRODUCTION_ROLE='production' as const;
 export const CUSTOMER_ROLE='customer' as const;
+export const OWNER_TESTING_MODE = true;
 export const ROLE_LABEL:Record<Role,string>={admin:'Owner / Admin',qa_qc_manager:'QC Manager',qc_checker:'QC Checker',qc_assistant:'QC Assistant',production:'Production',customer:'Customer'};
 export const isOwner=(r?:string)=>r===OWNER_ROLE;
 export const isQcManager=(r?:string)=>r===QC_MANAGER_ROLE;
@@ -34,8 +35,11 @@ export function resolveSignupRole(requestedRole?:string|null,hasExistingAdmin=fa
 }
 export type Gate='ok'|'login'|'denied'|'portal';
 export function gate(path:string,p:{role:Role;active:boolean}|null):Gate{
- if(!p||!p.active)return 'login';
- if(path.startsWith('/app/admin'))return isOwner(p.role)?'ok':'denied';
- if(path.startsWith('/app/dashboard')||path.startsWith('/app/department')||path.startsWith('/app/reports'))return isQcStaff(p.role)?'ok':p.role===CUSTOMER_ROLE?'portal':'denied';
- if(path.startsWith('/app/portal'))return p.role===CUSTOMER_ROLE?'ok':'denied';
+ if(!p)return 'login';
+ const isAdmin = isOwner(p.role);
+ const isSessionActive = p.active || (OWNER_TESTING_MODE && isAdmin);
+ if(!isSessionActive)return 'login';
+ if(path.startsWith('/app/admin'))return (OWNER_TESTING_MODE && isAdmin) || isAdmin ? 'ok' : 'denied';
+ if(path.startsWith('/app/dashboard')||path.startsWith('/app/department')||path.startsWith('/app/reports'))return (OWNER_TESTING_MODE && isAdmin) || isAdmin || isQcStaff(p.role)?'ok':p.role===CUSTOMER_ROLE?'portal':'denied';
+ if(path.startsWith('/app/portal'))return (OWNER_TESTING_MODE && isAdmin) || p.role===CUSTOMER_ROLE || isAdmin?'ok':'denied';
  return 'ok'}

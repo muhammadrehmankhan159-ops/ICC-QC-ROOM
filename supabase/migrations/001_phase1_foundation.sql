@@ -1,7 +1,7 @@
 -- PHASE 1: foundation, authentication, roles, departments, customers, security
 create type app_role as enum ('admin','qa_qc_manager','qc_checker','qc_assistant','production','customer');
 
-create table profiles(id uuid primary key references auth.users on delete cascade,full_name text,email text,role app_role not null default 'customer',active boolean not null default false,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+create table profiles(id uuid primary key references auth.users on delete cascade,full_name text,email text,role app_role not null default 'customer',active boolean not null default true,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table departments(id uuid primary key default gen_random_uuid(),name text not null unique,code text not null unique,active boolean not null default true,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table customers(id uuid primary key default gen_random_uuid(),name text not null unique,code text not null unique,active boolean not null default true,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table customer_department_access(id uuid primary key default gen_random_uuid(),customer_id uuid not null references customers on delete cascade,department_id uuid not null references departments on delete cascade,active boolean not null default true,created_at timestamptz not null default now(),unique(customer_id,department_id));
@@ -29,8 +29,8 @@ begin
   return new;
  end if;
  insert into profiles(id,email,full_name,role,active)
- values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'customer',false)
- on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='customer', active=false;
+ values(new.id,new.email,coalesce(new.raw_user_meta_data->>'full_name',new.email),'customer',true)
+ on conflict (id) do update set email=excluded.email, full_name=excluded.full_name, role='customer', active=true;
  return new;
 end$$;
 create trigger t_signup after insert on auth.users for each row execute function on_signup();

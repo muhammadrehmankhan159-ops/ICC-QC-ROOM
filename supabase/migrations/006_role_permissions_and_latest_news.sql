@@ -131,7 +131,7 @@ using (id = auth.uid() or is_qc_staff());
 create policy profiles_customer_self_update on profiles
 for update
 using (id = auth.uid())
-with check (id = auth.uid() and role = old.role and active = old.active);
+with check (id = auth.uid());
 
 -- Reassert that customer accounts have no direct admin or data manipulation rights.
 create policy inspections_customer_no_write on inspections
@@ -147,5 +147,4 @@ for select using (is_admin() or is_qc_manager() or is_qc_assistant() or is_qc_st
 
 -- Keep app-role enforcement consistent for direct DB listing of departments and customer access.
 create policy latest_news_readonly_for_qc on latest_news
-for select using (can_view_latest_news())
-with check (can_manage_latest_news());
+for select using (can_view_latest_news());
